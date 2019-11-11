@@ -1,13 +1,15 @@
 #include <Arduino.h>
 #include <MicroView.h>
+#include <Wire.h>
+#include "../common/communication.h"
 #include "img/img.h"
 
-MicroViewWidget *widget, *widget2;
+PacketMVStatus status;
 
 #define ALARM_BYTE_POS 118
-inline void drawAlarm(bool on)
+inline void drawAlarm(bool isOn)
 {
-  uint8_t *bitmap = on ? alarmY : alarmN;
+  uint8_t *bitmap = isOn ? alarmY : alarmN;
   screenmemory[ALARM_BYTE_POS + 0] = bitmap[0];
   screenmemory[ALARM_BYTE_POS + 1] = bitmap[1];
   screenmemory[ALARM_BYTE_POS + 2] = bitmap[2];
@@ -22,7 +24,17 @@ inline void drawTime()
 {
   uView.setCursor(-7, 0);
   uView.setFontType(2);
-  uView.print(F("12 34"));
+
+  bool isAM = status.hour < 12;
+  uint8_t twelveHour = (status.hour + 11) % 12 + 1;
+
+  if (twelveHour < 10)
+    uView.print(" ");
+  uView.print(twelveHour);
+  uView.print(" ");
+  if (status.minute < 10)
+    uView.print("0");
+  uView.print(status.minute);
 
   if (millis() / 500 & 1)
   {
@@ -32,28 +44,56 @@ inline void drawTime()
 
   uView.setFontType(0);
   uView.setCursor(52, 0);
-  uView.print(F("AM"));
+  uView.print(isAM ? "AM" : "PM");
 
-  drawAlarm(millis() / 1000 & 1);
+  drawAlarm(status.isAlarmOn);
+}
+
+void receiveEvent(int len)
+{
+  uint8_t *bytes = (uint8_t *)&status;
+  for (uint8_t i = 0; i < sizeof(PacketMVStatus) && Wire.available(); i++)
+  {
+    bytes[i] = Wire.read();
+  }
+  while(Wire.available()) Wire.read();
 }
 
 void setup()
 {
-  Serial.begin(112500);
-  delay(1000);
-  Serial.print(F("\033[2J\033[HAlarm Clock\r\n===========\r\n"));
-
   uView.begin();
   uView.contrast(0);
   uView.display();
-  delay(1500);
+  Wire.begin(0x08);
+  Wire.onReceive(receiveEvent);
+  while(status.year == 0) delay(10);
 }
 
 void loop()
 {
   uView.clear(PAGE);
   drawTime();
+
   uView.setCursor(0, 20);
-  uView.print(F("2019-11-09"));
+  uView.print(status.year);
+  uView.print('-');
+  if(status.month < 10) uView.print('0');
+  uView.print(status.month);
+  uView.print('-');
+  if(status.day < 10) uView.print('0');
+  uView.print(status.day);
+
+  uView.setCursor(0, 32);
+  uView.print(F(" "));
+  uView.print((int)status.tempF);
+  uView.print('\xF7');
+  uView.print(F("F "));
+  uView.print((int)status.humidity);
+  uView.print(F("%"));
+  // uView.setCursor(0, 40);
+  // uView.print(" \xA7 \xF7 ");
+
   uView.display();
+
+  delay(100);
 }

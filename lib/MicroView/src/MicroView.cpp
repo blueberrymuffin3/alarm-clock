@@ -15,6 +15,9 @@
 	You should have received a copy of the GNU General Public License
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#ifdef BOARD_MICROVIEW
+
 #include <avr/pgmspace.h>
 //#include <SPI.h>
 #include <MicroView.h>
@@ -1897,3 +1900,4 @@ uint8_t getInt16PrintLen(int16_t val) {
 
 	return count;
 }
+#endif
